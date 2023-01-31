@@ -74,17 +74,27 @@ func add_round_key(state, key []uint32) {
 	}
 }
 
-func transpose(in []uint32) []uint32 {
-	state := make([]uint32, 4)
-	get := func(row, col int) uint32 {
-		val := in[row] & (0xFF000000 >> (8 * col))
-		val <<= (8 * col)
-		return val >> (8 * row)
+// In place transpose
+func transpose(in []uint32) {
+	column_to_row := func(col uint32) uint32 {
+		var shift_amount uint32 = 8 * col
+		a := (in[0] & (0xFF000000 >> shift_amount)) << shift_amount
+		b := (in[1] & (0xFF000000 >> shift_amount)) << shift_amount
+		b >>= 8
+		c := (in[2] & (0xFF000000 >> shift_amount)) << shift_amount
+		c >>= 16
+		d := (in[3] & (0xFF000000 >> shift_amount)) << shift_amount
+		d >>= 24
+		return a ^ b ^ c ^ d
 	}
-	for row := 0; uint32(row) < Nb; row++ {
-		state[row] = get(0, row) ^ get(1, row) ^ get(2, row) ^ get(3, row)
-	}
-	return state
+	a := column_to_row(0)
+	b := column_to_row(1)
+	c := column_to_row(2)
+	d := column_to_row(3)
+	in[0] = a
+	in[1] = b
+	in[2] = c
+	in[3] = d
 }
 
 func encrypt(state, key []uint32, rounds int) {

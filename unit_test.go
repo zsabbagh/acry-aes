@@ -52,8 +52,9 @@ func TestRotateInverse(t *testing.T) {
 	test_value(t, got, 0x12345678)
 }
 
-func TestTranspose(t *testing.T) {
-	state := transpose([]uint32{0x01020304, 0x05060708, 0x09101112, 0x13141516})
+func TestTransposeAlternative(t *testing.T) {
+	state := []uint32{0x01020304, 0x05060708, 0x09101112, 0x13141516}
+	transpose(state)
 	test_value(t, state[0], 0x01050913)
 	test_value(t, state[1], 0x02061014)
 	test_value(t, state[2], 0x03071115)
