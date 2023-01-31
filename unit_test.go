@@ -9,10 +9,10 @@ func test_value(t *testing.T, got, want uint32) {
 }
 
 func TestSubstituteWord(t *testing.T) {
-	total := substitute_word(0x53535353)
+	total := substitute_word(0x53535353, false)
 	want := uint32(0xedededed)
 	test_value(t, total, want)
-	total = substitute_word(0x4014587f)
+	total = substitute_word(0x4014587f, false)
 	want = uint32(0x09fa6ad2)
 	test_value(t, total, want)
 }
@@ -24,7 +24,7 @@ func TestSubBytes(t *testing.T) {
 		0x59000059,
 		0x00000053,
 	}
-	sub_bytes(arr)
+	sub_bytes(arr, false)
 	want := uint32(0x6363ed63)
 	test_value(t, arr[0], want)
 	want = 0x20636363
@@ -36,15 +36,20 @@ func TestSubBytes(t *testing.T) {
 }
 
 func TestRotateLeft(t *testing.T) {
-	got := rotate_left(0x01020304, 1)
+	got := rotate(0x01020304, 1, false)
 	want := uint32(0x02030401)
 	test_value(t, got, want)
 }
 
 func TestRotateRight(t *testing.T) {
-	got := rotate_right(0x01020304, 1)
+	got := rotate(0x01020304, 1, true)
 	want := uint32(0x04010203)
 	test_value(t, got, want)
+}
+
+func TestRotateInverse(t *testing.T) {
+	got := rotate(rotate(0x12345678, 1, true), 1, false)
+	test_value(t, got, 0x12345678)
 }
 
 func TestTranspose(t *testing.T) {
@@ -68,7 +73,7 @@ func TestShiftRows(t *testing.T) {
 		0x01c6a158,
 		0xc6bc9d01,
 	}
-	input = shift_rows(input)
+	input = shift_rows(input, false)
 	for i := 0; i < 4; i++ {
 		test_value(t, input[0], expected[0])
 	}
