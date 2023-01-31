@@ -18,13 +18,13 @@ func TestSubstituteWord(t *testing.T) {
 }
 
 func TestSubBytes(t *testing.T) {
-	arr := [4]uint32{
+	arr := []uint32{
 		0x00005300,
 		0x54000000,
 		0x59000059,
 		0x00000053,
 	}
-	sub_bytes(&arr)
+	sub_bytes(arr)
 	want := uint32(0x6363ed63)
 	test_value(t, arr[0], want)
 	want = 0x20636363
@@ -35,8 +35,41 @@ func TestSubBytes(t *testing.T) {
 	test_value(t, arr[3], want)
 }
 
-func TestRotateWord(t *testing.T) {
+func TestRotateLeft(t *testing.T) {
 	got := rotate_left(0x01020304, 1)
 	want := uint32(0x02030401)
 	test_value(t, got, want)
+}
+
+func TestRotateRight(t *testing.T) {
+	got := rotate_right(0x01020304, 1)
+	want := uint32(0x04010203)
+	test_value(t, got, want)
+}
+
+func TestTranspose(t *testing.T) {
+	state := transpose([]uint32{0x01020304, 0x05060708, 0x09101112, 0x13141516})
+	test_value(t, state[0], 0x01050913)
+	test_value(t, state[1], 0x02061014)
+	test_value(t, state[2], 0x03071115)
+	test_value(t, state[3], 0x04081216)
+}
+
+func TestShiftRows(t *testing.T) {
+	input := []uint32{
+		0x8e9f01c6,
+		0x4ddc01c6,
+		0xa15801c6,
+		0xbc9d01c6,
+	}
+	expected := []uint32{
+		0x8e9f01c6,
+		0xdc01c64d,
+		0x01c6a158,
+		0xc6bc9d01,
+	}
+	input = shift_rows(input)
+	for i := 0; i < 4; i++ {
+		test_value(t, input[0], expected[0])
+	}
 }
