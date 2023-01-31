@@ -16,6 +16,23 @@ func substitute_word(word uint32, inverse bool) uint32 {
 	return (get(0) << 24) + (get(1) << 16) + (get(2) << 8) + get(3)
 }
 
+type AES struct {
+	key    []uint32
+	rounds uint32
+}
+
+func create_aes(key []byte, rounds uint32) AES {
+	new_key := make([]uint32, 4)
+	get := func(row, col uint32) uint32 {
+		return uint32(key[row+4*col]) << (8 * (3 - col))
+	}
+	for i := uint32(0); i < 4; i++ {
+		new_key[i] = get(i, 0) ^ get(i, 1) ^ get(i, 2) ^ get(i, 3)
+	}
+	aes := AES{new_key, rounds}
+	return aes
+}
+
 func sub_bytes(arr []uint32, inverse bool) {
 	for row := 0; row < len(arr); row++ {
 		arr[row] = substitute_word(arr[row], inverse)
@@ -54,6 +71,13 @@ func shift_rows(state []uint32, inverse bool) []uint32 {
 // mode = 0 for regular, 1 for inverse
 func mix_columns(state []uint32, inverse bool) []uint32 {
 	words := make([]uint32, 4)
+	to_bytes := func(val uint32) uint8, uint8, uint8, uint8 {
+		a := uint8(val & 0xFF000000 >> 24)
+		b := uint8(val & 0x00FF0000 >> 16)
+		c := uint8(val & 0x0000FF00 >> 8)
+		d := uint8(val & 0x000000FF)
+		return a,b,c,d
+	}
 	if inverse {
 		words[0] = mul14[state[0]] ^ mul11[state[1]] ^ mul13[state[2]] ^ mul9[state[3]]
 		words[1] = mul9[state[0]] ^ mul14[state[1]] ^ mul11[state[2]] ^ mul13[state[3]]
@@ -68,13 +92,15 @@ func mix_columns(state []uint32, inverse bool) []uint32 {
 	return words
 }
 
-func add_round_key(state, key []uint32) {
+func (aes *AES) add_round_key(state []uint32) {
 	for i := 0; uint32(i) < Nb; i++ {
-		state[i] ^= key[i]
+		state[i] ^= aes.key[i]
 	}
 }
 
-// In place transpose
+// In place transpose of a 4-length slice of uint32,
+// seen as a square matrix of bytes
+// where each uint32 is a row of 4 bytes
 func transpose(in []uint32) {
 	column_to_row := func(col uint32) uint32 {
 		var shift_amount uint32 = 8 * col
@@ -97,36 +123,60 @@ func transpose(in []uint32) {
 	in[3] = d
 }
 
-func encrypt(state, key []uint32, rounds int) {
+func init_state(in []byte) []uint32 {
+	out := make([]uint32, 4)
+	get := func(row, move uint32) uint32 {
+		return uint32(in[row+4*move]) << (8 * (3 - move))
+	}
+	for i := uint32(0); i < 4; i++ {
+		out[i] = get(i, 0) ^ get(i, 1) ^ get(i, 2) ^ get(i, 3)
+	}
+	return out
+}
 
-	add_round_key(state, key)
+func words_to_bytes(state []uint32, out []byte) {
+	var shift uint32
+	for i := 0; i < len(out); i++ {
+		shift = uint32(8 * (i % 4))
+		out[i] = byte((state[i/4] & (0xFF000000 >> shift)) >> (24 - shift))
+	}
+}
 
-	for round := 1; uint32(round) < Nr; round++ {
+func (aes *AES) encrypt(in []byte) {
+	state := init_state(in)
+	aes.add_round_key(state)
+
+	for round := uint32(1); round < aes.rounds; round++ {
 		sub_bytes(state, false)
 		state = shift_rows(state, false)
 		state = mix_columns(state, false)
-		add_round_key(state, key)
+		aes.add_round_key(state)
 	}
 
 	sub_bytes(state, false)
 	state = shift_rows(state, false)
-	add_round_key(state, key)
+	aes.add_round_key(state)
+
+	words_to_bytes(state, in)
 }
 
-func decrypt(state, key []uint32, rounds int) {
+func (aes *AES) decrypt(in []byte) {
 
-	add_round_key(state, key)
+	state := init_state(in)
+	aes.add_round_key(state)
 
-	for round := 1; uint32(round) < Nr; round++ {
+	for round := uint32(1); round < aes.rounds; round++ {
 		state = shift_rows(state, true)
 		sub_bytes(state, true)
-		add_round_key(state, key)
+		aes.add_round_key(state)
 		state = mix_columns(state, true)
 	}
 
 	state = shift_rows(state, true)
 	sub_bytes(state, true)
-	add_round_key(state, key)
+	aes.add_round_key(state)
+
+	words_to_bytes(state, in)
 }
 
 func main() {
