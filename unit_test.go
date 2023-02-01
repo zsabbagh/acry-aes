@@ -13,85 +13,73 @@ func test_value(t *testing.T, got, want uint32) {
 	}
 }
 
-func TestSubstituteWord(t *testing.T) {
-	total := substitute_word(0x53535353, false)
-	want := uint32(0xedededed)
-	test_value(t, total, want)
-	total = substitute_word(0x4014587f, false)
-	want = uint32(0x09fa6ad2)
-	test_value(t, total, want)
+func test_array_equals(t *testing.T, got, want []byte) {
+	if len(got) != len(want) {
+		t.Errorf("Length do not match, got: %x, want: %d.", len(got), len(want))
+	}
+	for i := 0; i < len(got); i++ {
+		if got[i] != want[i] {
+			t.Errorf("Byte do not match in pos %d, got: 0x%x, want: 0x%x.", i, got[i], want[i])
+		}
+	}
 }
 
 func TestSubBytes(t *testing.T) {
-	arr := []uint32{
-		0x00005300,
-		0x54000000,
-		0x59000059,
-		0x00000053,
+	arr := []byte{
+		0x00, 0x00, 0x53, 0x00,
+		0x54, 0x00, 0x00, 0x00,
+		0x59, 0x00, 0x00, 0x59,
+		0x00, 0x00, 0x00, 0x53,
 	}
 	sub_bytes(arr, false)
-	want := uint32(0x6363ed63)
-	test_value(t, arr[0], want)
-	want = 0x20636363
-	test_value(t, arr[1], want)
-	want = 0xcb6363cb
-	test_value(t, arr[2], want)
-	want = 0x636363ed
-	test_value(t, arr[3], want)
-}
-
-func TestRotateLeft(t *testing.T) {
-	got := rotate(0x01020304, 1, false)
-	want := uint32(0x02030401)
-	test_value(t, got, want)
-}
-
-func TestRotateRight(t *testing.T) {
-	got := rotate(0x01020304, 1, true)
-	want := uint32(0x04010203)
-	test_value(t, got, want)
-}
-
-func TestRotateInverse(t *testing.T) {
-	got := rotate(rotate(0x12345678, 1, true), 1, false)
-	test_value(t, got, 0x12345678)
+	want := []byte{
+		0x63, 0x63, 0xed, 0x63,
+		0x20, 0x63, 0x63, 0x63,
+		0xcb, 0x63, 0x63, 0xcb,
+		0x63, 0x63, 0x63, 0xed,
+	}
+	test_array_equals(t, arr, want)
 }
 
 func TestTranspose(t *testing.T) {
-	state := []uint32{0x01020304, 0x05060708, 0x09101112, 0x13141516}
+	state := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 	transpose(state)
-	test_value(t, state[0], 0x01050913)
-	test_value(t, state[1], 0x02061014)
-	test_value(t, state[2], 0x03071115)
-	test_value(t, state[3], 0x04081216)
-}
-
-func TestInitState(t *testing.T) {
-	in := []byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15}
-	state := init_state(in)
-	test_value(t, state[0], 0x00040812)
-	test_value(t, state[1], 0x01050913)
-	test_value(t, state[2], 0x02061014)
-	test_value(t, state[3], 0x03071115)
+	want := []byte{0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15}
+	test_array_equals(t, state, want)
 }
 
 func TestShiftRows(t *testing.T) {
-	input := []uint32{
-		0x8e9f01c6,
-		0x4ddc01c6,
-		0xa15801c6,
-		0xbc9d01c6,
+	input := []byte{
+		0x8e, 0x9f, 0x01, 0xc6,
+		0x4d, 0xdc, 0x01, 0xc6,
+		0xa1, 0x58, 0x01, 0xc6,
+		0xbc, 0x9d, 0x01, 0xc6,
 	}
-	expected := []uint32{
-		0x8e9f01c6,
-		0xdc01c64d,
-		0x01c6a158,
-		0xc6bc9d01,
+	expected := []byte{
+		0x8e, 0x9f, 0x01, 0xc6,
+		0xdc, 0x01, 0xc6, 0x4d,
+		0x01, 0xc6, 0xa1, 0x58,
+		0xc6, 0xbc, 0x9d, 0x01,
 	}
-	input = shift_rows(input, false)
-	for i := 0; i < 4; i++ {
-		test_value(t, input[0], expected[0])
+	shift_rows(input, false)
+	test_array_equals(t, input, expected)
+}
+
+func TestShiftRowsInverse(t *testing.T) {
+	input := []byte{
+		0x8e, 0x9f, 0x01, 0xc6,
+		0x4d, 0xdc, 0x01, 0xc6,
+		0xa1, 0x58, 0x01, 0xc6,
+		0xbc, 0x9d, 0x01, 0xc6,
 	}
+	expected := []byte{
+		0x8e, 0x9f, 0x01, 0xc6,
+		0xdc, 0x01, 0xc6, 0x4d,
+		0x01, 0xc6, 0xa1, 0x58,
+		0xc6, 0xbc, 0x9d, 0x01,
+	}
+	shift_rows(expected, true)
+	test_array_equals(t, expected, input)
 }
 
 func TestWordsToBytes(t *testing.T) {
@@ -108,11 +96,10 @@ func TestWordsToBytes(t *testing.T) {
 
 func TestData(t *testing.T) {
 	bytes, err := os.ReadFile("./data/aes_sample.in")
-	fmt.Println(hex.EncodeToString(bytes))
 	if err != nil {
 		t.Errorf("Could not open file.")
 	}
-	aes := create_aes(bytes[:16], 10)
+	aes := create_aes(bytes[:16], Nr, Nb, Nk)
 	fmt.Println(len(bytes))
 	for i := 16; i < len(bytes); i += 16 {
 		if i+16 > len(bytes) {
@@ -121,5 +108,39 @@ func TestData(t *testing.T) {
 		}
 		aes.encrypt(bytes[i : i+16])
 	}
-	fmt.Println(hex.EncodeToString(bytes))
+	expected, err := hex.DecodeString("52E418CBB1BE4949308B381691B109FE")
+	if err != nil {
+		t.Errorf("Could not parse string")
+	}
+	test_array_equals(t, bytes[16:], expected)
+}
+
+func TestMixColumns(t *testing.T) {
+	input := []byte{
+		0xdb, 0xf2, 0x01, 0xc6,
+		0x13, 0x0a, 0x01, 0xc6,
+		0x53, 0x22, 0x01, 0xc6,
+		0x45, 0x5c, 0x01, 0xc6}
+	expected := []byte{
+		0x8e, 0x9f, 0x01, 0xc6,
+		0x4d, 0xdc, 0x01, 0xc6,
+		0xa1, 0x58, 0x01, 0xc6,
+		0xbc, 0x9d, 0x01, 0xc6}
+	mix_columns(input, false)
+	test_array_equals(t, input, expected)
+}
+
+func TestMixInverse(t *testing.T) {
+	input := []byte{
+		0xdb, 0xf2, 0x01, 0xc6,
+		0x13, 0x0a, 0x01, 0xc6,
+		0x53, 0x22, 0x01, 0xc6,
+		0x45, 0x5c, 0x01, 0xc6}
+	expected := []byte{
+		0x8e, 0x9f, 0x01, 0xc6,
+		0x4d, 0xdc, 0x01, 0xc6,
+		0xa1, 0x58, 0x01, 0xc6,
+		0xbc, 0x9d, 0x01, 0xc6}
+	mix_columns(expected, true)
+	test_array_equals(t, expected, input)
 }
