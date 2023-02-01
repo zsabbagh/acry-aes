@@ -3,7 +3,7 @@ package main
 var Nb int = 4  // byte length in 32 bit words
 var Nk int = 4  // key length in 32 bit words
 var Nr int = 10 // 10 when nk=4, 12 nk=6, 14 nk=8
-var rcon = [16]byte{
+var glookup = [16]byte{
 	0x01,
 	0x02,
 	0x04,

@@ -9,12 +9,10 @@ type AES struct {
 	index    int
 }
 
-func copy(src []byte) []byte {
-	dst := make([]byte, len(src))
-	for i := 0; i < len(src); i++ {
-		dst[i] = src[i]
+func copy_word(from, to []byte) {
+	for i := 0; i < 4; i++ {
+		to[i] = from[i]
 	}
-	return dst
 }
 
 func create_aes(key []byte, nr, nb, nk int) AES {
@@ -108,35 +106,45 @@ func transpose(state []byte) {
 	}
 }
 
+func xor_word(dst, a, b []byte) {
+	for i := 0; i < 4; i++ {
+		dst[i] = a[i] ^ b[i]
+	}
+}
+
+func g_function(word []byte, i int) []byte {
+	out := make([]byte, 4)
+	for i := 0; i < 4; i++ {
+		out[i] = word[i]
+	}
+	rotate_word(out, -1)
+	sub_bytes(out, false)
+	out[0] ^= glookup[0]
+	return out
+}
+
 func (aes *AES) key_expansion() {
 
 	aes.key = make([]byte, 4*aes.nbytes*(aes.nrounds+1))
-	// the key occupies the first nwords slots of the expanded key
 	var i int
-	copy_word := func(src, dst []byte) {
-		for i := 0; i < 4; i++ {
-			dst[i] = src[i]
-		}
-	}
 	for i = 0; i < aes.nkey; i++ {
 		copy_word(aes.key_init[4*i:], aes.key[4*i:])
 	}
-	for i = aes.nkey; i < aes.nbytes*(aes.nrounds+1); i++ {
-		copy_word(aes.key[4*(i-1):], aes.key[4*i:])
-		if (i/aes.nbytes)%aes.nkey == 0 {
-			rotate_word(aes.key[4*i:], -1)
-			sub_bytes(aes.key[4*i:4*(i+1)], false)
-			aes.key[4*i] ^= rcon[i/aes.nkey]
-		} else if aes.nkey > 6 && i%4 == 0 {
-			sub_bytes(aes.key[4*i:4*(i+1)], false)
+	// i is word
+	var wi, wj int // position of word
+	var gal, prev []byte
+	// nkey is amount of words per segment in the key
+	for i = aes.nkey; i+aes.nkey <= aes.nbytes*(aes.nrounds+1); i += aes.nkey {
+		// calculate word start
+		wi = 4 * i
+		// prev is first word in key segment
+		prev = aes.key[wi-16:]
+		gal = g_function(aes.key[wi-4:], i/aes.nkey)
+		xor_word(aes.key[wi:], prev, gal)
+		for j := 1; j < aes.nkey; j++ {
+			wj = 4 * j
+			xor_word(aes.key[wi+wj:], prev[wj:], aes.key[wi-4:])
 		}
-		for j := 0; j < aes.nbytes; j++ {
-			aes.key[4*i+j] ^= aes.key[4*(i-aes.nkey)+j]
-		}
-	}
-
-	for i := 0; i+16 <= len(aes.key); i += 4 {
-		transpose(aes.key[i : i+16])
 	}
 }
 
@@ -163,6 +171,8 @@ func (aes *AES) encrypt(state []byte) {
 	sub_bytes(state, false)
 	shift_rows(state, false)
 	aes.add_round_key(state, false)
+
+	transpose(state)
 }
 
 func (aes *AES) decrypt(state []byte) {
@@ -180,6 +190,7 @@ func (aes *AES) decrypt(state []byte) {
 	shift_rows(state, true)
 	sub_bytes(state, true)
 	aes.add_round_key(state, true)
+	transpose(state)
 }
 
 func main() {
