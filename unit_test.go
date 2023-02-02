@@ -25,29 +25,17 @@ func test_array_equals(t *testing.T, got, want []byte) {
 }
 
 func TestKeyExpansion(t *testing.T) {
-	key := "YELLOW SUBMARINE"
-	expandedkey := []uint32{0x594f5552, 0x45574249, 0x4c204d4e, 0x4c534145, 0x632c792b,
-		0x6a3d7f36, 0x22024f01, 0x4c1f5e1b, 0x6448311a, 0x162b5462, 0x8d8fc0c1, 0xbda2fce7,
-		0xca82b3a9, 0x6e451173, 0x19965697, 0x1fbd41a6, 0x4dcf7cd5, 0xe6a3b2c1, 0x3dabfd6a,
-		0xcc713096, 0x25ea9643, 0xe447f534, 0xad06fb91, 0xcfbe8e18, 0x1df76122, 0x6522d7e3,
-		0x6fd6c, 0xd56be5fd, 0x4cbbdaf8, 0x3517c023, 0x5452afc3, 0x462dc835, 0xea518b73,
-		0x1b0cccef, 0xc2903ffc, 0x72ae2d7, 0x2e7ff487, 0xaba76b84, 0xcc5c639f, 0x88a24097,
-		0x4738cc4b, 0x70d7bc38, 0x44187be4, 0x9f3d7dea}
+	key, err := hex.DecodeString("000102030405060708090a0b0c0d0e0f")
+	if err != nil {
+		t.Fatalf("Could not decode string")
+	}
+	expected_key, err := hex.DecodeString("000102030405060708090a0b0c0d0e0fd6aa74fdd2af72fadaa678f1d6ab76feb692cf0b643dbdf1be9bc5006830b3feb6ff744ed2c2c9bf6c590cbf0469bf4147f7f7bc95353e03f96c32bcfd058dfd3caaa3e8a99f9deb50f3af57adf622aa5e390f7df7a69296a7553dc10aa31f6b14f9701ae35fe28c440adf4d4ea9c02647438735a41c65b9e016baf4aebf7ad2549932d1f08557681093ed9cbe2c974e13111d7fe3944a17f307a78b4d2b30c5")
+	if err != nil {
+		t.Fatalf("Could not decode string")
+	}
+	transpose_sets(expected_key)
 	aes := create_aes([]byte(key), Nr, Nb, Nk)
-	equals := func(exp uint32, act []byte) bool {
-		for i := 0; i < 4; i++ {
-			if byte(exp>>(3-i)) != act[i] {
-				return false
-			}
-		}
-		return true
-	}
-	for i := range expandedkey {
-		if !equals(expandedkey[i], aes.key[4*i:]) {
-			t.Errorf("Expanded key for %s is incorrect\n", key)
-			break
-		}
-	}
+	test_array_equals(t, aes.key, expected_key)
 }
 
 func TestSubBytes(t *testing.T) {
@@ -120,6 +108,30 @@ func TestWordsToBytes(t *testing.T) {
 	}
 }
 
+func TestCase(t *testing.T) {
+	key, err := hex.DecodeString("000102030405060708090a0b0c0d0e0f")
+	if err != nil {
+		t.Fatalf("Could not decode string")
+	}
+	expected_key, err := hex.DecodeString("000102030405060708090a0b0c0d0e0fd6aa74fdd2af72fadaa678f1d6ab76feb692cf0b643dbdf1be9bc5006830b3feb6ff744ed2c2c9bf6c590cbf0469bf4147f7f7bc95353e03f96c32bcfd058dfd3caaa3e8a99f9deb50f3af57adf622aa5e390f7df7a69296a7553dc10aa31f6b14f9701ae35fe28c440adf4d4ea9c02647438735a41c65b9e016baf4aebf7ad2549932d1f08557681093ed9cbe2c974e13111d7fe3944a17f307a78b4d2b30c5")
+	if err != nil {
+		t.Fatalf("Could not decode string")
+	}
+	transpose_sets(expected_key)
+	aes := create_aes([]byte(key), Nr, Nb, Nk)
+	test_array_equals(t, aes.key, expected_key)
+	in, err := hex.DecodeString("00112233445566778899aabbccddeeff")
+	if err != nil {
+		t.Fatalf("Could not decode string")
+	}
+	expected, err := hex.DecodeString("69c4e0d86a7b0430d8cdb78070b4c55a")
+	if err != nil {
+		t.Fatalf("Could not decode string")
+	}
+	out := aes.Encrypt(in)
+	test_array_equals(t, out, expected)
+}
+
 func TestData(t *testing.T) {
 	data, err := os.ReadFile("./data/aes_sample.in")
 	if err != nil {
@@ -139,14 +151,12 @@ func TestData(t *testing.T) {
 		t.Errorf("Could not parse DATA string")
 	}
 	test_array_equals(t, data, expected)
-	for i := 0; i+16 <= len(data); i += 16 {
-		aes.encrypt(data[i : i+16])
-	}
+	encrypted_data := aes.Encrypt(data)
 	expected, err = hex.DecodeString("52E418CBB1BE4949308B381691B109FE")
 	if err != nil {
 		t.Errorf("Could not parse string")
 	}
-	test_array_equals(t, data, expected)
+	test_array_equals(t, encrypted_data, expected)
 }
 
 func TestMixColumns(t *testing.T) {

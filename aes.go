@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 type AES struct {
 	key_init []byte // the initialisation key
@@ -53,6 +56,12 @@ func shift_rows(state []byte, inverse bool) {
 			shift = -i
 		}
 		rotate_word(state[4*i:4*(i+1)], shift)
+	}
+}
+
+func transpose_sets(data []byte) {
+	for i := 0; i+16 <= len(data); i += 16 {
+		transpose(data[i : i+16])
 	}
 }
 
@@ -121,13 +130,12 @@ func g_function(word []byte, i int) []byte {
 	}
 	rotate_word(out, -1)
 	sub_bytes(out, false)
-	out[0] ^= glookup[0]
+	out[0] ^= glookup[i-1]
 	return out
 }
 
 func (aes *AES) key_expansion() {
 	aes.key = make([]byte, 4*aes.nkey*(aes.nrounds+1))
-	fmt.Println(len(aes.key))
 	var i int
 	for wi := 0; wi < 4*aes.nkey; wi += 4 {
 		copy_word(aes.key_init[wi:], aes.key[wi:])
@@ -147,6 +155,7 @@ func (aes *AES) key_expansion() {
 			xor_word(aes.key[wi+j:], prev[j:], aes.key[wi+j-4:])
 		}
 	}
+	transpose_sets(aes.key)
 }
 
 func words_to_bytes(state []uint32, out []byte) {
@@ -154,6 +163,29 @@ func words_to_bytes(state []uint32, out []byte) {
 	for i := 0; i < len(out); i++ {
 		shift = uint32(8 * (i % 4))
 		out[i] = byte((state[i/4] & (0xFF000000 >> shift)) >> (24 - shift))
+	}
+}
+
+func (aes *AES) Encrypt(data []byte) []byte {
+	out := make([]byte, len(data))
+	copy(out, data)
+	var state []byte
+	for i := 0; i+16 <= len(out); i += 16 {
+		state = out[i : i+16]
+		transpose(state)
+		aes.encrypt(state)
+		transpose(state)
+	}
+	return out
+}
+
+func (aes *AES) EncryptData(data []byte) {
+	var state []byte
+	for i := 0; i+16 <= len(data); i += 16 {
+		state = data[i : i+16]
+		transpose(state)
+		aes.encrypt(state)
+		transpose(state)
 	}
 }
 
@@ -185,6 +217,28 @@ func (aes *AES) decrypt(state []byte) {
 	aes.add_round_key(state, true)
 }
 
+// Only encrypt
 func main() {
 	// state should be initialised with transpose
+	var n int
+	var err error
+	key := make([]byte, 16)
+	n, err = os.Stdin.Read(key)
+	if n < 1 || err != nil {
+		fmt.Println("Error reading data")
+		os.Exit(1)
+	}
+	aes := create_aes(key, Nr, Nb, Nk)
+	// Allocate 2 MB data
+	data := make([]byte, 2048)
+	for {
+		// Read data lazily
+		n, err = os.Stdin.Read(data)
+		if n < 1 || err != nil {
+			break
+		}
+		// Encrypt data on-the-go
+		aes.EncryptData(data[:n])
+		os.Stdout.Write(data[:n])
+	}
 }
