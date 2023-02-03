@@ -2,12 +2,6 @@
 
 ---
 
-> GitHub repo available for implementation
-https://github.com/zsabbagh/acry-aes, request access when necessary
-
-Zakaria Sabbagh, zsabbagh@kth.se
-> 
-
 # Introduction
 
 I worked on slices of bytes instead of array of words. This made certain operations different. I wrote the algorithm in Go. Sources used are “A Graduate Course in Applied Cryptography” by Dan Boneh and Victor Shoup, and the official [NIST publication from 2001](https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.197.pdf).
