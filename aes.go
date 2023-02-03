@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sync"
 )
 
 type AES struct {
@@ -11,7 +12,6 @@ type AES struct {
 	nrounds  int
 	nbytes   int
 	nkey     int
-	index    int
 }
 
 func copy_word(from, to []byte) {
@@ -21,7 +21,7 @@ func copy_word(from, to []byte) {
 }
 
 func create_aes(key []byte, nr, nb, nk int) AES {
-	aes := AES{key, []byte{}, nr, nb, nk, 0}
+	aes := AES{key, []byte{}, nr, nb, nk}
 	aes.key_expansion()
 	return aes
 }
@@ -94,14 +94,14 @@ func mix_columns(state []byte, inverse bool) {
 	}
 }
 
-func (aes *AES) add_round_key(state []byte, inverse bool) {
+func (aes *AES) add_round_key(state []byte, inverse bool, index *int) {
 	for i := 0; i < len(state); i++ {
-		state[i] ^= aes.key[aes.index+i]
+		state[i] ^= aes.key[(*index)+i]
 	}
 	if inverse {
-		aes.index -= 4 * aes.nkey
+		*index -= 4 * aes.nkey
 	} else {
-		aes.index += 4 * aes.nkey
+		*index += 4 * aes.nkey
 	}
 }
 
@@ -190,31 +190,31 @@ func (aes *AES) EncryptData(data []byte) {
 }
 
 func (aes *AES) encrypt(state []byte) {
-	aes.index = 0
-	aes.add_round_key(state, false)
+	index := 0
+	aes.add_round_key(state, false, &index)
 	for round := 1; round < aes.nrounds; round++ {
 		sub_bytes(state, false)
 		shift_rows(state, false)
 		mix_columns(state, false)
-		aes.add_round_key(state, false)
+		aes.add_round_key(state, false, &index)
 	}
 	sub_bytes(state, false)
 	shift_rows(state, false)
-	aes.add_round_key(state, false)
+	aes.add_round_key(state, false, &index)
 }
 
 func (aes *AES) decrypt(state []byte) {
-	aes.index = len(aes.key) - aes.nkey
-	aes.add_round_key(state, true)
+	index := len(aes.key) - 16
+	aes.add_round_key(state, true, &index)
 	for round := 1; round < aes.nrounds; round++ {
 		shift_rows(state, true)
 		sub_bytes(state, true)
-		aes.add_round_key(state, true)
+		aes.add_round_key(state, true, &index)
 		mix_columns(state, true)
 	}
 	shift_rows(state, true)
 	sub_bytes(state, true)
-	aes.add_round_key(state, true)
+	aes.add_round_key(state, true, &index)
 }
 
 // Only encrypt
@@ -230,7 +230,17 @@ func main() {
 	}
 	aes := create_aes(key, Nr, Nb, Nk)
 	// Allocate 2 MB data
-	data := make([]byte, 2048)
+	// parallellise!
+	threads := 10
+	length := 128
+	// Waitgroup
+	var wg sync.WaitGroup
+	data := make([]byte, length*threads)
+	runner := func(state []byte) {
+		defer wg.Done()
+		aes.EncryptData(state)
+	}
+	var stop int
 	for {
 		// Read data lazily
 		n, err = os.Stdin.Read(data)
@@ -238,7 +248,18 @@ func main() {
 			break
 		}
 		// Encrypt data on-the-go
-		aes.EncryptData(data[:n])
+		for i := 0; i < threads; i++ {
+			if length*i > n {
+				break
+			}
+			wg.Add(1)
+			stop = length * (i + 1)
+			if stop > n {
+				stop = n
+			}
+			go runner(data[length*i : stop])
+		}
+		wg.Wait()
 		os.Stdout.Write(data[:n])
 	}
 }
